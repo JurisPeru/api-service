@@ -1,0 +1,39 @@
+[tool.poetry]
+name = "JurisPeru API"
+version = "0.1.0"
+description = "RAG API Service"
+authors = ["Raúl Casanova raul.casanova.03@gmail.com"]
+packages = [
+    { include = "app", from = "src" }
+]
+
+[tool.poetry.dependencies]
+python = "3.13.*"
+langchain = "~0.3.27"
+langchain-anthropic = "~0.3.19"
+langchain-huggingface = "~0.3.1"
+langchain-chroma = "~0.2.5"
+langchain-pinecone = "~0.2.11"
+langchain-community = "~0.3.29"
+pydantic-settings = "^2.10.1"
+fastapi = {extras = ["standard"], version = "^0.116.1"}
+uvicorn = {extras = ["standard"], version = "^0.35.0"}
+pydantic = "^2.11.7"
+langchain-openai = "~0.3.32"
+lib-utils = {git = "ssh://git@github.com/JurisPeru/lib-utils.git", rev = "v0.1.0"}
+
+[tool.poetry.group.dev.dependencies]
+pytest = "~8.4.1"
+black = "~25.1.0"
+ruff = "~0.12.9"
+mypy = "~1.17.0"
+pytest-cov = "~6.2.1"
+pre-commit = "~4.3.0"
+
+[tool.black]
+line-length = 100
+target-version = ["py313"]
+
+[build-system]
+requires = ["poetry-core>=1.5.0"]
+build-backend = "poetry.core.masonry.api"

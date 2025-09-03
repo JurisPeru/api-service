@@ -1,0 +1,82 @@
+# Multi-stage build para reducir tamaño final
+FROM python:3.13-slim AS builder
+
+# Instalar dependencias del sistema necesarias para compilación
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Instalar poetry
+RUN pip install --no-cache-dir poetry
+
+# Configurar poetry para no crear virtualenv y instalar en /usr/local
+RUN poetry config virtualenvs.create false
+
+WORKDIR /app
+
+# Copiar lib_utils PRIMERO (necesario para resolver la dependencia local)
+COPY lib_utils/src ./lib_utils/src
+COPY lib_utils/pyproject.toml ./lib_utils/
+
+
+# Copiar archivos de dependencias
+COPY api-service/pyproject.toml api-service/poetry.lock ./backend/
+WORKDIR /app/backend
+
+# Instalar dependencias directamente con poetry (resuelve dependencias locales)
+RUN poetry install --only main --no-root --no-directory
+
+# Copiar código fuente y hacer instalación final
+COPY api-service/src ./src
+COPY api-service/config.yaml ./
+RUN poetry install --only main
+
+# Etapa final - imagen más ligera
+FROM python:3.13-slim
+
+# Instalar solo dependencias runtime necesarias
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
+    && apt-get autoremove -y
+
+# Crear usuario no-root por seguridad
+RUN useradd --create-home --shell /bin/bash app
+
+# Copiar dependencias instaladas desde builder
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Variables de entorno para optimizar Python
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app/src
+
+WORKDIR /app
+
+# Crear directorio de cache y configurar permisos
+RUN mkdir -p  /app/logs && \
+    chown -R app:app /app/logs
+
+# Cambiar a usuario no-root para descargar modelo
+USER app
+
+
+# Copiar código fuente
+COPY --chown=app:app lib_utils/src ./lib_utils/src
+COPY --chown=app:app lib_utils/pyproject.toml ./lib_utils/
+COPY --chown=app:app api-service/src ./src  
+COPY --chown=app:app api-service/config.yaml ./
+
+# Limpiar archivos temporales de Python
+RUN find /home/app/.local -type d -name __pycache__ -exec rm -rf {} + || true && \
+    find /home/app/.local -type f -name "*.pyc" -delete || true
+
+EXPOSE 8000
+
+HEALTHCHECK CMD curl --fail http://localhost:8000/api/health || exit 1
+
+WORKDIR /app/src
+CMD ["python", "-m", "fastapi", "run", "app/main.py", "--host", "0.0.0.0", "--port", "8000"]

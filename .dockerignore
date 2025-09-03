@@ -1,0 +1,12 @@
+.git
+.gitignore
+README.md
+tests/
+.pytest_cache
+__pycache__
+*.pyc
+.env
+.venv
+.venv/
+config.yaml
+.benchmarks/
