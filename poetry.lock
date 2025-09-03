@@ -1936,7 +1936,7 @@ langchain-pinecone = "~0.2.11"
 
 [package.source]
 type = "git"
-url = "ssh://git@github.com/JurisPeru/lib-utils.git"
+url = "https://github.com/JurisPeru/lib-utils.git"
 reference = "v0.1.0"
 resolved_reference = "cc4bb2a37dc5b0ba95fa36e2773179cafc10b764"
 
@@ -5331,4 +5331,4 @@ cffi = ["cffi (>=1.17) ; python_version >= \"3.13\" and platform_python_implemen
 [metadata]
 lock-version = "2.1"
 python-versions = "3.13.*"
-content-hash = "e55dd60f69d5a1da24a6c85ebfbfec46381dadd8f92552d74e7e837272909586"
+content-hash = "845485ca0dad8928f7255e31cf6d7e76147ad98d32dca6dd75f8e5481e3370b6"
