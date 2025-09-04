@@ -17,7 +17,7 @@ async def ask(request: AskRequest, rag: RagDep) -> Any:
         return StreamingResponse(
             rag.run_rag_pipeline_stream(request, "mmr"),
             media_type="text/event-stream",
-            headers={"Connection": "keep-alive"},
+            headers={"Connection": "close"},
         )
     except ValueError as e:
         raise HTTPException(
