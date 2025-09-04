@@ -17,8 +17,13 @@ async def ask(request: AskRequest, rag: RagDep) -> Any:
         return StreamingResponse(
             rag.run_rag_pipeline_stream(request, "mmr"),
             media_type="text/event-stream",
+            headers={"Connection": "keep-alive"},
         )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
