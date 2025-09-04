@@ -1937,8 +1937,8 @@ langchain-pinecone = "~0.2.11"
 [package.source]
 type = "git"
 url = "https://github.com/JurisPeru/lib-utils.git"
-reference = "v0.1.0"
-resolved_reference = "cc4bb2a37dc5b0ba95fa36e2773179cafc10b764"
+reference = "v0.1.1"
+resolved_reference = "0b8447bce4c634c97b892f1cb426bf83e1229aa1"
 
 [[package]]
 name = "markdown-it-py"
@@ -5331,4 +5331,4 @@ cffi = ["cffi (>=1.17) ; python_version >= \"3.13\" and platform_python_implemen
 [metadata]
 lock-version = "2.1"
 python-versions = "3.13.*"
-content-hash = "845485ca0dad8928f7255e31cf6d7e76147ad98d32dca6dd75f8e5481e3370b6"
+content-hash = "52ffba58c760c287f189dfd299f418f6064459747852cfca912cc1853a9c2f47"
