@@ -15,11 +15,11 @@ logger = logging.getLogger(__name__)
 async def ask(request: AskRequest, rag: RagDep) -> Any:
     try:
         return StreamingResponse(
-            rag.run_rag_pipeline_stream(request, "mmr"),
+            rag.run_rag_pipeline_stream(request),
             media_type="text/event-stream",
-            headers={"Connection": "close"},
+            headers={"Connection": "keep-alive"},
         )
-    except ValueError as e:
+    except RuntimeError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )

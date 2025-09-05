@@ -1,5 +1,6 @@
 import logging
 from typing import Any, AsyncGenerator
+from langchain_core.documents.base import Document
 from langchain_core.embeddings import Embeddings
 from lib_utils.interfaces.vector_store import VectorStoreClient
 from langchain.chat_models import init_chat_model
@@ -46,7 +47,7 @@ class RagService:
             if settings.vector_store.api_key:
                 self.vs_client: VectorStoreClient = PineconeService(
                     self.embedding,
-                    settings.vector_store.api_key.get_secret_value(),
+                    settings.vector_store.api_key,
                     settings.vector_store.index_name,
                     settings.embedding.size,
                     rerank_top_n=settings.vector_store.rerank_top_n,
@@ -65,21 +66,26 @@ class RagService:
 
         self.rag_prompt: ChatPromptTemplate = rag_prompt
 
-    async def _retrieve_and_rerank(
-        self, ask_request: AskRequest, retrieval_type: str
-    ) -> list[dict[str, Any]]:
+    async def _retrieve_documents(
+        self, embedding_docs: list[float], k: int
+    ) -> list[Document]:
         """
         Retrieve documents using the vector store client and optionally rerank them.
         """
         try:
-            docs_retrieved = await self.vs_client.retrieve(
-                ask_request.query, retrieval_type, ask_request.k
-            )
-            docs_reranked = await self.vs_client.rerank_context(docs_retrieved, ask_request.query)
-            return docs_reranked
-        except Exception as e:
-            logger.exception(f"Error in _retrieve_and_rerank: {e}")
-            return []
+            retrieved_docs = await self.vs_client.retrieve(embedding_docs, k)
+            return retrieved_docs
+        except RuntimeError as e:
+            logging.exception(f"RuntimeError occurred in retrieve: {e}")
+            raise
+
+    async def _rerank_documents(self, query, documents) -> list[dict[str, Any]]:
+        try:
+            reranked_docs = await self.vs_client.rerank_context(documents, query)
+            return reranked_docs
+        except RuntimeError as e:
+            logging.exception(f"RuntimeError occurred in rerank: {e}")
+            raise
 
     async def _stream_llm_events(
         self, chain, ask_request, retrieved_docs
@@ -98,29 +104,44 @@ class RagService:
                 if event["event"] == "on_chat_model_stream":
                     data = event["data"].get("chunk")
                     if data:
-                        logger.debug(f"Yielding: {data.text()}")
-                        yield AskResponse(stage="tok", data=data.text()).model_dump_json()
+                        yield AskResponse(
+                            stage="tok", data=data.text()
+                        ).model_dump_json()
                 elif event["event"] == "on_chat_model_end":
                     data = event["data"].get("output")
                     if data:
                         logger.info("LLM stream ended, yielding final response.")
-                        logger.debug(f"Yielding data: {data.text()}\nContexts: {retrieved_docs}")
                         yield AskResponse(
                             stage="end", data=data.text(), contexts=retrieved_docs
                         ).model_dump_json()
         except Exception as e:
-            logger.error(f"Error during LLM streaming: {e}", exc_info=True)
+            logger.error(f"Error during LLM streaming: {e}")
+            raise
 
     async def run_rag_pipeline_stream(
-        self, ask_request: AskRequest, retrieval_type: str
+        self, ask_request: AskRequest
     ) -> AsyncGenerator[str, None]:
         """
         Executes a streaming RAG pipeline: yields LLM response chunks.
         """
-        retrieved_docs = await self._retrieve_and_rerank(ask_request, retrieval_type)
+        # Embbeding documents
+        try:
+            embedded_docs = await self.embedding.aembed_query(ask_request.query)
+        except RuntimeError as e:
+            raise e
+        # Retrieve from vector store
+        retrieved_docs = await self._retrieve_documents(embedded_docs, ask_request.k)
         if not retrieved_docs:
             logger.warning("No documents retrieved; aborting pipeline.")
-            return
+            raise Exception("No documents retrieved.")
+        # Rerank documents
+        reranked_docs = await self._rerank_documents(ask_request.query, retrieved_docs)
+        if not reranked_docs:
+            logger.warning("No documents retrieved; aborting pipeline.")
+            raise Exception("No documents reranked.")
+        # Generate response
         chain = self.rag_prompt | self.chat_llm
-        async for response in self._stream_llm_events(chain, ask_request, retrieved_docs):
+        async for response in self._stream_llm_events(
+            chain, ask_request, reranked_docs
+        ):
             yield response
