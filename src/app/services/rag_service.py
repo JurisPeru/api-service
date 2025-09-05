@@ -104,16 +104,20 @@ class RagService:
                 if event["event"] == "on_chat_model_stream":
                     data = event["data"].get("chunk")
                     if data:
-                        yield AskResponse(
-                            stage="tok", data=data.text()
-                        ).model_dump_json()
+                        yield (
+                            AskResponse(stage="tok", data=data.text()).model_dump_json()
+                            + "\n"
+                        )
                 elif event["event"] == "on_chat_model_end":
                     data = event["data"].get("output")
                     if data:
                         logger.info("LLM stream ended, yielding final response.")
-                        yield AskResponse(
-                            stage="end", data=data.text(), contexts=retrieved_docs
-                        ).model_dump_json()
+                        yield (
+                            AskResponse(
+                                stage="end", data=data.text(), contexts=retrieved_docs
+                            ).model_dump_json()
+                            + "\n"
+                        )
         except Exception as e:
             logger.error(f"Error during LLM streaming: {e}")
             raise
