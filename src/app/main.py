@@ -22,5 +22,5 @@ app.add_middleware(
 )
 
 
-app.include_router(router=health.router)
+app.include_router(router=health.router, prefix="/api")
 app.include_router(router=ask.router, prefix="/api")
