@@ -5,6 +5,7 @@ FROM python:3.13-slim AS builder
 RUN apt-get update && apt-get install -y \
     build-essential \
     gcc \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Instalar poetry
@@ -15,21 +16,18 @@ RUN poetry config virtualenvs.create false
 
 WORKDIR /app
 
-# Copiar lib_utils PRIMERO (necesario para resolver la dependencia local)
-COPY lib_utils/src ./lib_utils/src
-COPY lib_utils/pyproject.toml ./lib_utils/
-
-
 # Copiar archivos de dependencias
-COPY api-service/pyproject.toml api-service/poetry.lock ./backend/
-WORKDIR /app/backend
+COPY pyproject.toml poetry.lock ./
+
+RUN --mount=type=secret,id=github_token \
+    GITHUB_TOKEN=$(cat /run/secrets/github_token) && \
+    git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
 
 # Instalar dependencias directamente con poetry (resuelve dependencias locales)
 RUN poetry install --only main --no-root --no-directory
 
 # Copiar código fuente y hacer instalación final
-COPY api-service/src ./src
-COPY api-service/config.yaml ./
+COPY src ./src
 RUN poetry install --only main
 
 # Etapa final - imagen más ligera
@@ -52,23 +50,17 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Variables de entorno para optimizar Python
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/app/src
+    PYTHONPATH=/app
 
 WORKDIR /app
 
-# Crear directorio de cache y configurar permisos
-RUN mkdir -p  /app/logs && \
-    chown -R app:app /app/logs
+RUN touch app.log && chown app:app app.log
 
 # Cambiar a usuario no-root para descargar modelo
 USER app
 
-
 # Copiar código fuente
-COPY --chown=app:app lib_utils/src ./lib_utils/src
-COPY --chown=app:app lib_utils/pyproject.toml ./lib_utils/
-COPY --chown=app:app api-service/src ./src  
-COPY --chown=app:app api-service/config.yaml ./
+COPY --chown=app:app src ./src  
 
 # Limpiar archivos temporales de Python
 RUN find /home/app/.local -type d -name __pycache__ -exec rm -rf {} + || true && \
@@ -76,7 +68,6 @@ RUN find /home/app/.local -type d -name __pycache__ -exec rm -rf {} + || true &&
 
 EXPOSE 8000
 
-HEALTHCHECK CMD curl --fail http://localhost:8000/api/health || exit 1
+HEALTHCHECK CMD curl --fail http://localhost:8000/api/health/ || exit 1
 
-WORKDIR /app/src
-CMD ["python", "-m", "fastapi", "run", "app/main.py", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "fastapi", "run", "src/app/main.py", "--host", "0.0.0.0", "--port", "8000"]

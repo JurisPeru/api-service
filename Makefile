@@ -1,4 +1,4 @@
-.PHONY: install format lint typecheck test run coverage docker-build
+.PHONY: install format lint typecheck test run coverage docker-build docker-run
 
 install:
 	poetry install
@@ -21,5 +21,11 @@ coverage:
 run:
 	poetry run uvicorn src.app.main:app --host 0.0.0.0 --reload
 
+docker-build:
+	DOCKER_BUILDKIT=1 docker buildx build \
+					--secret id=github_token,env=GITHUB_TOKEN \
+					--network=host -f Dockerfile.prod -t jurisperu-api .
+docker-run:
+	docker run -d -p 8000:8000 --env-file .env --name api jurisperu-api
 
 all: install format lint typecheck test
